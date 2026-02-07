@@ -36,6 +36,8 @@
 | **API** | `pwsh ./scripts/gnosis-container.ps1 -Serve -GatewayPort 4000` | HTTP server, each POST spawns a Codex run |
 | **Full power interactive** | `pwsh ./scripts/gnosis-container.ps1 -Danger -Privileged` | Unrestricted Codex sandbox + Docker privileged mode |
 
+> New in progress: the Ruby-based GLaDOS CLI (`glados`) lives in `scripts/glados.rb` and will eventually replace the PowerShell entrypoint. It's currently a scaffold with GLaDOS-flavored output while the full rewrite lands.
+
 ---
 
 ## 30-Second Quickstart
