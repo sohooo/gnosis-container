@@ -32,7 +32,7 @@
 | **API** | `./scripts/glados.rb --serve --gateway-port 4000` | Starts the Ruby gateway on port 4000 |
 | **Full power interactive** | `./scripts/glados.rb --run --danger --privileged` | Unrestricted Codex sandbox + privileged Docker |
 
-*If you are still attached to PowerShell, `scripts/gnosis-container.ps1` remains. I won’t pretend to be impressed.*
+*If you are still attached to PowerShell, the legacy `scripts/gnosis-container.ps1` remains available. I won’t pretend to be impressed.*
 
 ---
 
@@ -75,7 +75,7 @@ If GLaDOS calls you a “test subject,” that is not a bug. It’s a feature.
 
 - **Docker** (Desktop or Engine) — `docker network create codex-network` once
 - **Ruby** on the host for the CLI (already in the container for the gateway)
-- **PowerShell** only if you insist on using `gnosis-container.ps1`
+- **PowerShell** optional (legacy) if you insist on using `gnosis-container.ps1`
 - **For Ollama/local models:** keep daemon running at `127.0.0.1:11434`
 - **For GPU services:** NVIDIA + CUDA drivers
 
