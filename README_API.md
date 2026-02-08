@@ -1,6 +1,6 @@
 # Codex Gateway API
 
-> HTTP service implemented by `scripts/codex_gateway.js`. Each request spawns a Codex process, returns when complete.
+> HTTP service implemented by `scripts/glados_gateway.rb`. Each request spawns a Codex process, returns when complete — and may judge you silently while doing so.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -10,7 +10,12 @@
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Start the gateway:**
+**Start the gateway (GLaDOS Ruby gateway):**
+```powershell
+./scripts/glados.rb --serve --gateway-port 4000
+```
+
+**Legacy Node gateway (PowerShell entrypoint):**
 ```powershell
 pwsh ./scripts/gnosis-container.ps1 -Serve -GatewayPort 4000
 ```
@@ -30,16 +35,10 @@ curl -X POST http://localhost:4000/completion \
 |--------|----------|-------------|
 | `GET` | `/health` | Liveness probe |
 | `GET` | `/` | Gateway info, endpoints, config |
-| `GET` | `/status` | Concurrency, uptime, memory, watcher/webhook |
+| `GET` | `/status` | Concurrency, uptime |
 | `POST` | `/completion` | Run a prompt |
 | `GET` | `/sessions` | List sessions |
 | `GET` | `/sessions/:id` | Session details |
-| `GET` | `/sessions/:id/search` | Search session logs |
-| `POST` | `/sessions/:id/prompt` | Continue a session |
-| `POST` | `/sessions/:id/nudge` | Replay with updated metadata |
-| `GET` | `/triggers` | List configured monitor triggers |
-| `POST` | `/triggers` | Create or replace trigger definitions |
-| `PATCH/DELETE` | `/triggers/:id` | Update or remove a trigger |
 
 ---
 
@@ -52,8 +51,15 @@ curl -X POST http://localhost:4000/completion \
 | `CODEX_GATEWAY_MAX_BODY_BYTES` | 1048576 | Max request size (1 MiB) |
 | `CODEX_GATEWAY_MAX_CONCURRENT` | 2 | Max parallel Codex runs |
 | `CODEX_GATEWAY_TIMEOUT_MS` | 120000 | Default execution timeout |
+| `CODEX_GATEWAY_IDLE_TIMEOUT_MS` | 900000 | Idle timeout for long-running requests |
 | `CODEX_GATEWAY_MAX_TIMEOUT_MS` | 1800000 | Max allowed timeout (30 min) |
 | `CODEX_GATEWAY_DEFAULT_MODEL` | *(empty)* | Default model |
+| `CODEX_GATEWAY_EXTRA_ARGS` | *(empty)* | Extra CLI flags passed to Codex |
+| `CODEX_GATEWAY_JSON_FLAG` | --experimental-json | JSON flag used when `json_mode` is true |
+| `CODEX_GATEWAY_SESSION_DIRS` | *(varies)* | Comma-separated session directories |
+| `CODEX_GATEWAY_SESSION_DIR` | *(empty)* | Single session directory override |
+| `CODEX_GATEWAY_SECURE_SESSION_DIR` | *(empty)* | Directory for secure sessions |
+| `CODEX_GATEWAY_SECURE_TOKEN` | *(empty)* | Token for secure sessions |
 
 **Authentication:** None by default. Use `CODEX_GATEWAY_SECURE_TOKEN` for secure sessions or front with your own auth proxy.
 
@@ -77,9 +83,7 @@ Gateway metadata: watcher config, webhook config, environment, available endpoin
 
 ```json
 {
-  "status": "codex-gateway",
-  "watcher": { "enabled": false, "paths": [], "pattern": "**/*" },
-  "webhook": { "configured": false },
+  "status": "glados-gateway",
   "env": { "CODEX_GATEWAY_SESSION_DIRS": ["/opt/codex-home/.codex/sessions"] },
   "endpoints": {
     "health": "/health",
@@ -87,10 +91,7 @@ Gateway metadata: watcher config, webhook config, environment, available endpoin
     "completion": { "path": "/completion", "method": "POST" },
     "sessions": {
       "list": { "path": "/sessions", "method": "GET" },
-      "detail": { "path": "/sessions/:id", "method": "GET" },
-      "search": { "path": "/sessions/:id/search", "method": "GET" },
-      "prompt": { "path": "/sessions/:id/prompt", "method": "POST" },
-      "nudge": { "path": "/sessions/:id/nudge", "method": "POST" }
+      "detail": { "path": "/sessions/:id", "method": "GET" }
     }
   }
 }
@@ -105,10 +106,7 @@ Extended status with concurrency, uptime, memory.
 ```json
 {
   "concurrency": { "active": 1, "max": 2, "available": 1 },
-  "uptime": 3600,
-  "memory": { "rss": 52428800, "heapTotal": 20971520, "heapUsed": 15728640 },
-  "watcher": { "enabled": true, "paths": ["/workspace/temp"] },
-  "webhook": { "configured": true, "url_tail": "...example.com/hook" }
+  "uptime": 3600
 }
 ```
 
@@ -155,18 +153,11 @@ Run a prompt through Codex.
 {
   "session_id": "session-abc123",
   "gateway_session_id": "session-abc123",
-  "codex_session_id": "sess_xyz",
   "model": "gpt-4o-mini",
   "output": "The workspace contains...",
-  "messages": [...],
-  "usage": {
-    "input_tokens": 1234,
-    "output_tokens": 321,
-    "cached_input_tokens": 0,
-    "total_tokens": 1555
-  },
-  "logs_path": "/opt/codex-home/.codex/sessions/gateway/session-abc123",
-  "metadata": { "source": "api" }
+  "stderr": "",
+  "exit_code": 0,
+  "logs_path": "/opt/codex-home/.codex/sessions/gateway/session-abc123"
 }
 ```
 
@@ -194,52 +185,31 @@ Run a prompt through Codex.
 
 List known sessions.
 
-**Query params:**
-| Param | Default | Description |
-|-------|---------|-------------|
-| `limit` | 50 | Max sessions (max 200) |
-| `since` | — | ISO timestamp, filter sessions modified after |
-
 **Response:**
 ```json
-[
-  {
-    "session_id": "session-abc123",
-    "dir": "/path/to/session",
-    "modified": "2025-01-15T10:30:00Z",
-    "metadata": { ... }
-  }
-]
+{ "sessions": ["session-abc123", "session-def456"] }
 ```
 
 ---
 
 ### GET /sessions/:id
 
-Session details. Accepts gateway session ID or Codex session ID.
-
-**Query params:**
-| Param | Default | Description |
-|-------|---------|-------------|
-| `tail_lines` | 200 | Lines of logs to return |
-| `include_stderr` | false | Include stderr output |
-| `include_events` | false | Include raw event stream |
+Session details. Returns the summary payload if present.
 
 **Response:**
 ```json
 {
-  "session_id": "session-abc123",
-  "codex_session_id": "sess_xyz",
-  "status": "completed",
-  "created_at": "2025-01-15T10:30:00Z",
-  "updated_at": "2025-01-15T10:31:00Z",
-  "model": "gpt-4o-mini",
-  "runs": 1,
-  "stdout": { "tail": "...", "tail_lines": 200 },
-  "stderr": { "tail": "...", "tail_lines": 200 },
-  "events": [...]
+  "prompt": "List files in workspace",
+  "output": "The workspace contains...",
+  "created_at": "2025-01-15T10:30:00Z"
 }
 ```
+
+---
+
+## Legacy Node gateway endpoints
+
+The endpoints below are supported by the legacy Node.js gateway, not yet by the Ruby GLaDOS gateway.
 
 ---
 
