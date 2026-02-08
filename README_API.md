@@ -11,11 +11,11 @@
 ```
 
 **Start the gateway (GLaDOS Ruby gateway):**
-```powershell
+```bash
 ./scripts/glados.rb --serve --gateway-port 4000
 ```
 
-**Legacy Node gateway (PowerShell entrypoint):**
+**Legacy Node gateway (PowerShell entrypoint, deprecated):**
 ```powershell
 pwsh ./scripts/gnosis-container.ps1 -Serve -GatewayPort 4000
 ```
@@ -310,6 +310,14 @@ Each mutation persists to the trigger file and immediately refreshes the schedul
 When enabled, file changes automatically trigger `/completion` runs.
 
 **Enable with env vars before starting gateway:**
+```bash
+export CODEX_GATEWAY_WATCH_PATHS='temp;inbox'
+export CODEX_GATEWAY_WATCH_PROMPT_FILE='./MONITOR.md'
+export CODEX_GATEWAY_WATCH_PATTERN='**/*.txt'
+./scripts/glados.rb --serve --gateway-port 4000
+```
+
+**PowerShell (legacy/deprecated):**
 ```powershell
 $env:CODEX_GATEWAY_WATCH_PATHS = 'temp;inbox'
 $env:CODEX_GATEWAY_WATCH_PROMPT_FILE = './MONITOR.md'
@@ -401,7 +409,7 @@ Get notified when sessions complete.
 |----------|-------------|
 | `CODEX_SANDBOX_NETWORK_DISABLED` | Passed to Codex CLI |
 
-Full options in `scripts/codex_gateway.js`.
+Full options in `scripts/glados_gateway.rb`.
 
 ---
 
