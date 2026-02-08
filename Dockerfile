@@ -42,6 +42,8 @@ RUN apt-get update \
     python3 \
     python3-pip \
     python3-venv \
+    ruby \
+    ruby-dev \
     rustc \
     socat \
     unzip \
@@ -99,6 +101,9 @@ ENV BAML_WORKSPACE=/opt/baml-workspace
 # Keep npm on the latest patch level for node 24
 RUN npm install -g npm@11.6.1
 
+# Install minimal Ruby dependencies for the GLaDOS gateway
+RUN gem install rack -v 3.1.7
+
 # Inside the container we consider the environment already sufficiently locked
 # down, therefore instruct Codex CLI to allow running without sandboxing.
 ENV CODEX_UNSAFE_ALLOW_NO_SANDBOX=1
@@ -128,6 +133,11 @@ RUN sed -i 's/\r$//' /usr/local/bin/codex_login.sh \
 COPY scripts/codex_gateway.js /usr/local/bin/
 RUN sed -i 's/\r$//' /usr/local/bin/codex_gateway.js \
   && chmod 555 /usr/local/bin/codex_gateway.js
+
+# Copy GLaDOS Ruby gateway HTTP service
+COPY scripts/glados_gateway.rb /usr/local/bin/
+RUN sed -i 's/\r$//' /usr/local/bin/glados_gateway.rb \
+  && chmod 555 /usr/local/bin/glados_gateway.rb
 
 # Copy monitor script for container-based monitoring
 RUN mkdir -p /opt/scripts
